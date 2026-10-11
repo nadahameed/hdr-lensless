@@ -1,3 +1,12 @@
+# /// script
+# dependencies = [
+#   "numpy",
+#   "torch",
+#   "torch.nn.functional",
+#   "torchvision.transforms.v2"
+# ]
+# ///
+
 import torch
 import torch.nn.functional as F
 import numpy as np
@@ -36,7 +45,7 @@ def make_psf(h, w, points=5, seed=999):
 
 
 # normal lens forward model
-def normal_lens_fwd(img):
+def normal_fwd(img):
     
     # psf does nothing so we can skip
 
@@ -72,3 +81,15 @@ def lensless_fwd(img):
     clipped = torch.clip(noisy, min_lum, max_lum)
 
     return clipped
+
+# burst method (baseline)
+def burst(img, num_frames=8, exposure=0.1):
+
+    burst_frames = []
+    underexposed = img * exposure
+
+    for _ in range(num_frames):
+        frame = normal_fwd(underexposed)
+        burst_frames.append(frame)
+
+    return burst_frames, exposure
