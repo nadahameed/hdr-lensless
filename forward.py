@@ -14,29 +14,28 @@ from torchvision.transforms.v2 import GaussianNoise
 
 # sensor noise
 def sensor_noise(img):
-    h, w = img.shape
 
     # poisson
     poisson = torch.poisson(img)
 
     # gaussian
-    gaussian = torch.randn(h, w)
+    gaussian = torch.randn_like(img)
 
     return poisson + gaussian
 
-def make_psf(h, w, points=5, seed=999):
+def make_psf(ksize=9, points=5, seed=999):
     torch.manual_seed(seed)
 
-    psf = torch.zeros((1, 1, h, w))
+    psf = torch.zeros((1, 1, ksize, ksize))
 
     # generate random points
-    x = torch.randint(2, h - 2, (points,))
-    y = torch.randint(2, w - 2, (points,))
+    x = torch.randint(2, ksize, (points,))
+    y = torch.randint(2, ksize, (points,))
     psf[0, 0, x, y] = 1.0
 
-    # blur (9x9)
-    kernel = torch.ones((1, 1, 9, 9)) / 81.0
-    psf = F.conv2d(psf, kernel, padding = 9 // 2)
+    # blur (3x3)
+    kernel = torch.ones((1, 1, 3, 3)) / 9.0
+    psf = F.conv2d(psf, kernel, padding = 1)
 
     # normalize
     psf = psf / torch.sum(psf)
@@ -60,16 +59,12 @@ def normal_fwd(img):
     return clipped
 
 # lensless system forward model
-def lensless_fwd(img):
-    h, w = img.shape
-
-    # psf
-    psf = make_psf(h, w)
+def lensless_fwd(img, psf):
 
     # apply psf
-    img_4d = img.unsqueeze(0).unsqueeze(0)
-    img_conv = F.conv2d(img_4d, psf)
-    img_conv = img_conv.squeeze() # to get rid of batch + channel dimensions
+    img_4d = img.unsqueeze(0)
+    img_conv = F.conv2d(img_4d, psf, padding="same")
+    img_conv = img_conv.squeeze(0) # to get rid of batch + channel dimensions
     # to extend to color, just apply psf to all color channels
 
     # add sensor noise
@@ -83,7 +78,7 @@ def lensless_fwd(img):
     return clipped
 
 # burst method (baseline)
-def burst(img, num_frames=8, exposure=0.1):
+def burst_m(img, num_frames=8, exposure=0.1):
 
     burst_frames = []
     underexposed = img * exposure
@@ -92,4 +87,4 @@ def burst(img, num_frames=8, exposure=0.1):
         frame = normal_fwd(underexposed)
         burst_frames.append(frame)
 
-    return burst_frames, exposure
+    return burst_frames

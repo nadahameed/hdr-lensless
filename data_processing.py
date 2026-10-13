@@ -15,8 +15,7 @@ def cifar_to_hdr(img, max_lum = 1000.0, gamma = 3.0):
     # cifar rgb tensor --> 1 channel hdr scene
 
     # grayscale
-    gray_T = T.Grayscale(num_output_channels=1)
-    gray = gray_T(img)
+    gray = T.functional.rgb_to_grayscale(img, num_output_channels=1)
 
     # scale intensity --> exponential curve to push brightest pixels higher
     hdr = (gray ** gamma) * max_lum
@@ -32,23 +31,27 @@ def make_cifar_dataset(num_samples=10):
     os.makedirs(raw, exist_ok=True)
     os.makedirs(hdr, exist_ok=True)
 
-    # download cifar-10 to raw
+    print("loading cifar...")
+
+    transform = T.Compose([
+        T.ToImage(),
+        T.ToDtype(torch.float32, scale=True)
+    ])
+
     cifar = torchvision.datasets.CIFAR10(
         root=raw,
         train=True,
         download=True,
-        transform=T.ToImage() # tensor
+        transform=transform
     )
 
     # process to hdr and save
     print("processing to hdr.....")
     hdr_imgs = []
     for i in range(num_samples):
-        img, label = cifar[i]
-        img = img.float() / 255.0 # normalize
+        img, _ = cifar[i]
         hdr_img = cifar_to_hdr(img)
         hdr_imgs.append(hdr_img)
-        print(f"image number {i}")
 
     # save as a pytorch file
     hdr_dataset = torch.stack(hdr_imgs)
@@ -80,4 +83,4 @@ def make_synthetic_dataset(num_samples=10, size=32):
 
 
 if __name__ == "__main__":
-    make_synthetic_dataset(num_samples=10)
+    make_cifar_dataset(num_samples=10)
